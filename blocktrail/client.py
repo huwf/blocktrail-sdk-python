@@ -20,18 +20,21 @@ class APIClient(object):
 
         self.client = connection.RestClient(api_endpoint=api_endpoint, api_key=api_key, api_secret=api_secret, debug=debug)
 
-    def address(self, address):
+    def address_response(self, address):
         """
         get a single address
 
         :param str      address:        the address hash
-        :rtype: dict
+        :rtype: requests.Response
         """
         response = self.client.get("/address/%s" % (address, ))
 
-        return response.json()
+        return response
 
-    def address_transactions(self, address, page=1, limit=20, sort_dir='asc'):
+    def address(self, address):
+        return self.address_response(address).json()
+
+    def address_transactions_response(self, address, page=1, limit=20, sort_dir='asc'):
         """
         get all transactions for an address (paginated)
 
@@ -39,14 +42,17 @@ class APIClient(object):
         :param int      page:           pagination page, starting at 1
         :param int      limit:          the amount of transactions per page, can be between 1 and 200
         :param str      address:        sorted ASC or DESC (on time)
-        :rtype: dict
+        :rtype: requests.Response
         """
 
         response = self.client.get("/address/%s/transactions" % (address, ), params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
 
-        return response.json()
+        return response
 
-    def address_unconfirmed_transactions(self, address, page=1, limit=20, sort_dir='asc'):
+    def address_transactions(self, address, page=1, limit=20, sort_dir='asc'):
+        return self.address_transactions_response(address, page, limit, sort_dir).json()
+
+    def address_unconfirmed_transactions_response(self, address, page=1, limit=20, sort_dir='asc'):
         """
         get all unconfirmed transactions for an address (paginated)
 
@@ -54,13 +60,16 @@ class APIClient(object):
         :param int      page:           pagination page, starting at 1
         :param int      limit:          the amount of transactions per page, can be between 1 and 200
         :param str      sort_dir:       sorted ASC or DESC (on time)
-        :rtype: dict
+        :rtype: requests.Response
         """
         response = self.client.get("/address/%s/unconfirmed-transactions" % (address, ), params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
 
-        return response.json()
+        return response
 
-    def address_unspent_outputs(self, address, page=1, limit=20, sort_dir='asc'):
+    def address_unconfirmed_transactions(self, address, page=1, limit=20, sort_dir='asc'):
+        return self.address_unconfirmed_transactions(address, page, limit, sort_dir).json()
+
+    def address_unspent_outputs_response(self, address, page=1, limit=20, sort_dir='asc'):
         """
         get all inspent outputs for an address (paginated)
 
@@ -68,23 +77,43 @@ class APIClient(object):
         :param int      page:           pagination page, starting at 1
         :param int      limit:          the amount of transactions per page, can be between 1 and 200
         :param str      sort_dir:       sorted ASC or DESC (on time)
-        :rtype: dict
+        :rtype: requests.Response
         """
         response = self.client.get("/address/%s/unspent-outputs" % (address, ), params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
 
-        return response.json()
+        return response
 
-    def verify_address(self, address, signature):
+    def address_unspent_outputs(self, address, page=1, limit=20, sort_dir='asc'):
+        return self.address_unspent_outputs_response(address, page, limit, sort_dir).json()
+
+    def verify_address_response(self, address, signature):
         """
         verify ownership of an address
 
         :param str      address:        the address hash
         :param str      signature:      signature generated with PK with message being the :address
-        :rtype: dict
+        :rtype: requests.Response
         """
         response = self.client.post("/address/%s/verify" % (address, ), data={'signature': signature}, auth=True)
 
-        return response.json()
+        return response
+
+    def verify_address(self, address, signature):
+        return self.verify_address_response(address, signature).json()
+
+    def all_blocks_response(self, page=1, limit=20, sort_dir='asc'):
+        """
+        get all blocks (paginated)
+
+        :param int      page:            pagination page, starting at 1
+        :param int      limit:           the amount of transactions per page, can be between 1 and 200
+        :param str      sort_dir:        sorted ASC or DESC (on time)
+        :rtype: requests.Response
+        """
+
+        response = self.client.get("/all-blocks", params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
+
+        return response
 
     def all_blocks(self, page=1, limit=20, sort_dir='asc'):
         """
@@ -96,7 +125,15 @@ class APIClient(object):
         :rtype: dict
         """
 
-        response = self.client.get("/all-blocks", params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
+        return self.all_blocks_response(page, limit, sort_dir).json()
+
+    def block_latest_response(self):
+        """
+        get the latest block
+
+        :rtype: requests.Response
+        """
+        response = self.client.get("/block/latest")
 
         return response.json()
 
@@ -106,23 +143,39 @@ class APIClient(object):
 
         :rtype: dict
         """
-        response = self.client.get("/block/latest")
+        return self.block_latest_response().json()
 
-        return response.json()
-
-    def block(self, block):
+    def block_response(self, block):
         """
         get a block
 
         :param str|int  block:           the block hash or block height
-        :rtype: dict
+        :rtype: requests.Response
         """
 
         response = self.client.get("/block/%s" % (block, ))
 
         return response.json()
 
-    def block_transactions(self, block, page=1, limit=20, sort_dir='asc'):
+    def block(self, block):
+        return self.block_response(block).json()
+
+    def block_transactions_response(self, block, page=1, limit=20, sort_dir='asc'):
+        """
+        get all transactions for a block (paginated)
+
+        :param str|int  block:           the block hash or block height
+        :param int      page:            pagination page, starting at 1
+        :param int      limit:           the amount of transactions per page, can be between 1 and 200
+        :param str      sort_dir:        sorted ASC or DESC (on time)
+        :rtype: requests.Response
+        """
+
+        response = self.client.get("/block/%s/transactions" % (block, ), params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
+
+        return response
+
+    def block_transactions_dict(self, block, page=1, limit=20, sort_dir='asc'):
         """
         get all transactions for a block (paginated)
 
@@ -132,8 +185,17 @@ class APIClient(object):
         :param str      sort_dir:        sorted ASC or DESC (on time)
         :rtype: dict
         """
+        return self.block_transactions_response(block, page, limit, sort_dir)
 
-        response = self.client.get("/block/%s/transactions" % (block, ), params={'page': page, 'limit': limit, 'sort_dir': sort_dir})
+    def transaction_response(self, txhash):
+        """
+        get a single transaction
+
+        :param str      txhash:          the transaction hash
+        :rtype: requests.Response
+        """
+
+        response = self.client.get("/transaction/%s" % (txhash, ))
 
         return response.json()
 
@@ -144,10 +206,7 @@ class APIClient(object):
         :param str      txhash:          the transaction hash
         :rtype: dict
         """
-
-        response = self.client.get("/transaction/%s" % (txhash, ))
-
-        return response.json()
+        return self.transaction(txhash).json()
 
     def all_webhooks(self, page=1, limit=20):
         """
