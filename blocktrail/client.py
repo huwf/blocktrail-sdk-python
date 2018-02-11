@@ -1,7 +1,11 @@
 from blocktrail import connection
-
+from datetime import datetime
+import time
 
 class APIClient(object):
+    requests = 0
+    max_requests_per_minute = 300
+
     def __init__(self, api_key, api_secret, network='BTC', testnet=False, api_version='v1', api_endpoint=None, debug=False):
         """
         :param str      api_key:        the API_KEY to use for authentication
@@ -13,12 +17,38 @@ class APIClient(object):
                                          this will cause the :network, :testnet and :api_version to be ignored!
         :param bool     debug:          print debug information when requests fail
         """
-
+        self.init_time = datetime.now()
         if api_endpoint is None:
             network = ("t" if testnet else "") + network.upper()
             api_endpoint = "https://api.blocktrail.com/%s/%s" % (api_version, network)
 
         self.client = connection.RestClient(api_endpoint=api_endpoint, api_key=api_key, api_secret=api_secret, debug=debug)
+
+    def _check_limit(self):
+        if self.requests >= 300:
+            return datetime.now().second - self.init_time.second
+
+    def check_limit_and_sleep(self):
+        sleep = self._check_limit()
+        if sleep:
+            print('Limit reached. Sleeping for %d seconds' % sleep + 1)
+            time.sleep(sleep + 1)
+            return sleep
+        return 0
+
+    def reset_limits(self):
+        print('Resetting requests to 0 and init_time to %s' % str(datetime.now()))
+        self.requests = 0
+        self.init_time = datetime.now()
+
+    def make_api_call(self, func, params):
+        self.check_limit_and_sleep()
+        func(*params)
+        self.requests += 1
+
+    def reset_limit(self):
+        self.init_time = datetime.now()
+        self.requests = 0
 
     def address_response(self, address):
         """
@@ -67,7 +97,7 @@ class APIClient(object):
         return response
 
     def address_unconfirmed_transactions(self, address, page=1, limit=20, sort_dir='asc'):
-        return self.address_unconfirmed_transactions(address, page, limit, sort_dir).json()
+        return self.address_unconfirmed_transactions_response(address, page, limit, sort_dir).json()
 
     def address_unspent_outputs_response(self, address, page=1, limit=20, sort_dir='asc'):
         """
@@ -135,7 +165,7 @@ class APIClient(object):
         """
         response = self.client.get("/block/latest")
 
-        return response.json()
+        return response
 
     def block_latest(self):
         """
@@ -155,7 +185,7 @@ class APIClient(object):
 
         response = self.client.get("/block/%s" % (block, ))
 
-        return response.json()
+        return response
 
     def block(self, block):
         return self.block_response(block).json()
@@ -175,7 +205,7 @@ class APIClient(object):
 
         return response
 
-    def block_transactions_dict(self, block, page=1, limit=20, sort_dir='asc'):
+    def block_transactions(self, block, page=1, limit=20, sort_dir='asc'):
         """
         get all transactions for a block (paginated)
 
@@ -185,7 +215,7 @@ class APIClient(object):
         :param str      sort_dir:        sorted ASC or DESC (on time)
         :rtype: dict
         """
-        return self.block_transactions_response(block, page, limit, sort_dir)
+        return self.block_transactions_response(block, page, limit, sort_dir).json()
 
     def transaction_response(self, txhash):
         """
@@ -197,7 +227,7 @@ class APIClient(object):
 
         response = self.client.get("/transaction/%s" % (txhash, ))
 
-        return response.json()
+        return response
 
     def transaction(self, txhash):
         """
@@ -206,7 +236,7 @@ class APIClient(object):
         :param str      txhash:          the transaction hash
         :rtype: dict
         """
-        return self.transaction(txhash).json()
+        return self.transaction_response(txhash).json()
 
     def all_webhooks(self, page=1, limit=20):
         """
