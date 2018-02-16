@@ -1,6 +1,11 @@
 from blocktrail import connection
 from datetime import datetime
 import time
+from blocktrail.exceptions import *
+import requests
+from requests.exceptions import ConnectionError
+import logging
+
 
 class APIClient(object):
     requests = 0
@@ -15,24 +20,38 @@ class APIClient(object):
         :param str      api_version:    the version of the API to consume
         :param str      api_endpoint:   overwrite the endpoint used
                                          this will cause the :network, :testnet and :api_version to be ignored!
-        :param bool     debug:          print debug information when requests fail
+        :param bool     debug:          print debug information when requests fail, and extra client info
         """
         self.init_time = datetime.now()
         if api_endpoint is None:
             network = ("t" if testnet else "") + network.upper()
             api_endpoint = "https://api.blocktrail.com/%s/%s" % (api_version, network)
+        log_level = 'DEBUG' if debug else 'ERROR'
+        logging.basicConfig(
+            level = log_level,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.log = logging.getLogger('__main__')
 
         self.client = connection.RestClient(api_endpoint=api_endpoint, api_key=api_key, api_secret=api_secret, debug=debug)
 
     def _check_limit(self):
+        print('self.requests', self.requests)
+        now = datetime.now()
+        td = now - self.init_time
+        # print(td)
+        if (now - self.init_time).seconds >= 60:
+            self.requests = 0
+            self.init_time = now
+            return self.reset_limits()
         if self.requests >= 300:
-            return datetime.now().second - self.init_time.second
+            return 60 - (now - self.init_time).seconds
 
     def check_limit_and_sleep(self):
         sleep = self._check_limit()
         if sleep:
-            print('Limit reached. Sleeping for %d seconds' % sleep + 1)
+            print('Limit reached. Sleeping for %d seconds' % (sleep + 1))
             time.sleep(sleep + 1)
+            self.reset_limits()
             return sleep
         return 0
 
@@ -40,15 +59,31 @@ class APIClient(object):
         print('Resetting requests to 0 and init_time to %s' % str(datetime.now()))
         self.requests = 0
         self.init_time = datetime.now()
+        return 0
 
-    def make_api_call(self, func, params):
-        self.check_limit_and_sleep()
-        func(*params)
-        self.requests += 1
+    def make_api_call(self, func, kwargs):
 
-    def reset_limit(self):
-        self.init_time = datetime.now()
-        self.requests = 0
+        try:
+            self.check_limit_and_sleep()
+            self.requests += 1
+            return func(**kwargs)
+        except RateLimitExceededError as e:
+            print(e)
+            print('About to sleep for 15 seconds')
+            time.sleep(15)
+            self.reset_limits()
+            return self.make_api_call(func, kwargs)
+        except (GenericHTTPError, GenericServerError) as e:
+            print('Something went wrong their end. Sleep for a while and try again')
+            print(e)
+            time.sleep(15)
+            return self.make_api_call(func, kwargs)
+        except ConnectionError as e:
+            print(e)
+            print('Sleep for a while and try again')
+            time.sleep(15)
+            return self.make_api_call(func, kwargs)
+
 
     def address_response(self, address):
         """

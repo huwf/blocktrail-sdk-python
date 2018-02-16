@@ -31,6 +31,9 @@ class InvalidCredentials(BlockTrailSDKException):
     pass
 
 
+class RateLimitExceededError(BlockTrailSDKException):
+    pass
+
 class MissingEndpoint(BlockTrailSDKException):
     pass
 

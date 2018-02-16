@@ -22,7 +22,8 @@ EXCEPTION_EMPTY_RESPONSE = "The HTTP Response was empty."
 EXCEPTION_UNKNOWN_ENDPOINT_SPECIFIC_ERROR = "The endpoint returned an unknown error."
 EXCEPTION_MISSING_ENDPOINT = "The endpoint you've tried to access does not exist. Check your URL."
 EXCEPTION_OBJECT_NOT_FOUND = "The object you've tried to access does not exist."
-
+EXCEPTION_RATE_LIMIT_EXCEEDED = "You have exceeded your rate limit. " \
+                                "You should handle this by calling time.sleep for a while"
 
 class RestClient(object):
     def __init__(self, api_endpoint, api_key, api_secret, debug=False):
@@ -171,9 +172,12 @@ class RestClient(object):
                 raise MissingEndpoint(msg=EXCEPTION_MISSING_ENDPOINT, code=404)
             else:
                 raise ObjectNotFound(msg=EXCEPTION_OBJECT_NOT_FOUND, code=404)
+        elif response.status_code == 429:
+            raise RateLimitExceededError(msg=EXCEPTION_RATE_LIMIT_EXCEEDED, code=429)
         elif response.status_code == 500:
             raise GenericServerError(msg=EXCEPTION_GENERIC_SERVER_ERROR, code=response.status_code)
         else:
+
             raise GenericHTTPError(msg=EXCEPTION_GENERIC_HTTP_ERROR, code=response.status_code)
 
     @classmethod
